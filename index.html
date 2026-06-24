@@ -321,20 +321,30 @@
 <script>
     // 본인의 Supabase 정보 입력
     const SUPABASE_URL = 'https://wvstpuunhdlsqfufxymw.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Ind2c3RwdXVuaGRsc3FmdWZ4eW13Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDc0NzgsImV4cCI6MjA5NzgyMzQ3OH0.Knfw4f2zKo0Z3K4kb3IxXn9XaCeKOCrNKoo5GSSCnoc';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const SUPABASE_ANON_KEY = 'sb_publishable_oUAh6VeN-WC--oG8TZzHqg_2PYDGajA';
+    
+    let supabase;
+    try {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    } catch (e) {
+        alert('Supabase 초기화 실패! 상단 CDN 링크를 확인하세요: ' + e.message);
+    }
 
     let allWorks = [];
 
     async function fetchWorks() {
-        const { data, error } = await supabase.from('works').select('*');
-        if (error) {
-            console.error('Data load error:', error);
-            alert('데이터 로드에 실패했습니다. RLS 및 URL 설정을 확인하세요.');
-            return;
+        try {
+            if (!supabase) return;
+            const { data, error } = await supabase.from('works').select('*');
+            if (error) {
+                alert('데이터 로드 에러:\n' + JSON.stringify(error, null, 2));
+                return;
+            }
+            allWorks = data || [];
+            renderWorks();
+        } catch (e) {
+            alert('fetchWorks 함수 실행 에러:\n' + e.message);
         }
-        allWorks = data || [];
-        renderWorks();
     }
 
     function parseTags(str) {
@@ -343,36 +353,46 @@
     }
 
     async function saveWork() {
-        const id = document.getElementById('workId').value;
-        const title = document.getElementById('title').value.trim();
-        const author = document.getElementById('author').value.trim() || null;
-        const link = document.getElementById('link').value.trim() || null;
-        const review_short = document.getElementById('review_short').value.trim() || null;
-        const review_long = document.getElementById('review_long').value.trim() || null;
-        const ratingVal = document.getElementById('rating').value;
-        const rating = ratingVal ? parseInt(ratingVal, 10) : null;
-        const favorite = document.getElementById('favorite').checked;
-        const tags = parseTags(document.getElementById('tags').value);
+        try {
+            const id = document.getElementById('workId').value;
+            const title = document.getElementById('title').value.trim();
+            const author = document.getElementById('author').value.trim() || null;
+            const link = document.getElementById('link').value.trim() || null;
+            const review_short = document.getElementById('review_short').value.trim() || null;
+            const review_long = document.getElementById('review_long').value.trim() || null;
+            const ratingVal = document.getElementById('rating').value;
+            const rating = ratingVal ? parseInt(ratingVal, 10) : null;
+            const favorite = document.getElementById('favorite').checked;
+            const tags = parseTags(document.getElementById('tags').value);
 
-        if (!title) return alert('제목은 필수입니다.');
+            if (!title) return alert('제목은 필수입니다.');
 
-        const payload = { title, author, link, review_short, review_long, rating, favorite, tags };
+            const payload = { title, author, link, review_short, review_long, rating, favorite, tags };
 
-        let error;
-        if (id) {
-            const res = await supabase.from('works').update(payload).eq('id', id);
-            error = res.error;
-        } else {
-            const res = await supabase.from('works').insert([payload]);
-            error = res.error;
-        }
+            if (!supabase) {
+                alert('Supabase 연결 객체가 없습니다.');
+                return;
+            }
 
-        if (error) {
-            console.error('Save error:', error);
-            alert('저장에 실패했습니다.');
-        } else {
-            resetForm();
-            fetchWorks();
+            let error;
+            if (id) {
+                const res = await supabase.from('works').update(payload).eq('id', id);
+                error = res.error;
+            } else {
+                const res = await supabase.from('works').insert([payload]);
+                error = res.error;
+            }
+
+            if (error) {
+                alert('Supabase 저장 실패 에러 내용:\n' + JSON.stringify(error, null, 2));
+            } else {
+                alert('🎉 성공적으로 저장되었습니다!');
+                resetForm();
+                fetchWorks();
+            }
+        } catch (e) {
+            // 여기가 핵심! 먹통이 되던 원인을 팝업으로 강제 출력합니다.
+            alert('자바스크립트 실행 중 치명적 에러 발생:\n' + e.message);
         }
     }
 
@@ -414,9 +434,13 @@
 
     async function deleteWork(id) {
         if (!confirm('삭제하시겠습니까?')) return;
-        const { error } = await supabase.from('works').delete().eq('id', id);
-        if (error) alert('삭제 실패');
-        else fetchWorks();
+        try {
+            const { error } = await supabase.from('works').delete().eq('id', id);
+            if (error) alert('삭제 실패:\n' + JSON.stringify(error, null, 2));
+            else fetchWorks();
+        } catch (e) {
+            alert('삭제 중 에러 발생:\n' + e.message);
+        }
     }
 
     function renderWorks() {
@@ -518,7 +542,7 @@
                 if (!confirm(`${parsed.length}개의 데이터를 추가할까요?`)) { event.target.value = ''; return; }
 
                 const { error } = await supabase.from('works').insert(parsed);
-                if (error) alert('DB 저장 오류');
+                if (error) alert('DB 저장 오류:\n' + JSON.stringify(error, null, 2));
                 else { alert('완료되었습니다.'); fetchWorks(); }
             } catch (err) { alert('잘못된 파일입니다.'); }
             event.target.value = '';
@@ -526,7 +550,6 @@
         reader.readAsText(file);
     }
 
+    // 초기 실행
     fetchWorks();
 </script>
-</body>
-</html>
