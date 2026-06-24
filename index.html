@@ -1,1 +1,460 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>작품 아카이브 웹앱</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --favorite: #f59e0b;
+            --bg: #f8fafc;
+            --surface: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #cbd5e1;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 15px;
+            line-height: 1.5;
+        }
+        .container { max-width: 700px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 20px; font-size: 1.8rem; }
+        .card {
+            background: var(--surface);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            margin-bottom: 16px;
+        }
+        h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
+        .form-group { margin-bottom: 12px; }
+        .form-row { display: flex; gap: 10px; margin-bottom: 12px; }
+        .form-row > * { flex: 1; min-width: 0; }
+        label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.9rem; }
+        input[type="text"], input[type="number"], select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 1rem;
+            background: #fff;
+        }
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 28px; }
+        .checkbox-group input { width: 18px; height: 18px; }
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            width: 100%;
+            transition: background 0.2s;
+        }
+        button:hover { background-color: var(--primary-hover); }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn-danger { background-color: #ef4444; }
+        .btn-danger:hover { background-color: #dc2626; }
+        .btn-secondary { background-color: #64748b; }
+        .btn-secondary:hover { background-color: #475569; }
+        
+        /* 필터 섹션 */
+        .filter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+        @media (min-width: 480px) {
+            .filter-grid { grid-template-columns: 1fr 1fr; }
+            .form-row-mobile { display: flex; gap: 10px; }
+        }
 
+        /* 작품 아이템 스타일 */
+        .work-item {
+            border: 1px solid var(--border);
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            background: var(--surface);
+            position: relative;
+        }
+        .work-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+        .work-title { font-size: 1.2rem; margin: 0; font-weight: bold; }
+        .work-author { font-size: 0.95rem; color: var(--text-light); margin: 2px 0 8px 0; }
+        .fav-star { color: var(--favorite); font-size: 1.2rem; }
+        .rating-display { color: var(--favorite); margin-bottom: 8px; }
+        .review-box { background: #f1f5f9; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 0.95rem; }
+        .review-long { font-size: 0.9rem; color: #334155; white-space: pre-wrap; border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 6px; }
+        .work-link { display: inline-block; font-size: 0.85rem; color: var(--primary); margin-bottom: 8px; word-break: break-all; }
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+        .tags span { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
+        .item-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; border-top: 1px solid #f1f5f9; padding-top: 8px; }
+        .item-actions button { width: auto; padding: 6px 12px; font-size: 0.85rem; }
+
+        /* 파일 UI */
+        .backup-zone { display: flex; gap: 10px; }
+        .backup-zone button { padding: 10px; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>작품 아카이브</h1>
+
+    <div class="card">
+        <h3 id="formTitle">새 작품 등록</h3>
+        <input type="hidden" id="workId">
+        
+        <div class="form-row">
+            <div class="form-group" style="flex: 2;">
+                <label>제목 *</label>
+                <input type="text" id="title" placeholder="작품 제목 입력">
+            </div>
+            <div class="form-group">
+                <label>작가</label>
+                <input type="text" id="author" placeholder="작가명">
+            </div>
+        </div>
+
+        <div class="form-row form-row-mobile">
+            <div class="form-group">
+                <label>평점</label>
+                <select id="rating">
+                    <option value="">평점 선택 없음</option>
+                    <option value="5">⭐⭐⭐⭐⭐ (5점)</option>
+                    <option value="4">⭐⭐⭐⭐ (4점)</option>
+                    <option value="3">⭐⭐⭐ (3점)</option>
+                    <option value="2">⭐⭐ (2점)</option>
+                    <option value="1">⭐ (1점)</option>
+                </select>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="favorite">
+                <label style="display:inline; cursor:pointer;" for="favorite">즐겨찾기 등록</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>원문 링크</label>
+            <input type="text" id="link" placeholder="https://...">
+        </div>
+
+        <div class="form-group">
+            <label>한줄평 (짧은 리뷰)</label>
+            <input type="text" id="review_short" placeholder="목록에 노출될 짧은 감상">
+        </div>
+
+        <div class="form-group">
+            <label>상세 리뷰 (긴 리뷰)</label>
+            <textarea id="review_long" rows="4" placeholder="상세한 후기나 기록을 남겨보세요"></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>태그 (쉼표로 구분)</label>
+            <input type="text" id="tags" placeholder="예: 판타지, 완결, 추천">
+        </div>
+
+        <div class="btn-group">
+            <button id="saveBtn" onclick="saveWork()">저장하기</button>
+            <button id="cancelBtn" class="btn-secondary" style="display:none;" onclick="resetForm()">취소</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>검색 및 조건 필터</h3>
+        <div class="form-group">
+            <input type="text" id="searchTitle" placeholder="제목으로 검색..." onkeyup="renderWorks()">
+        </div>
+        <div class="filter-grid">
+            <div class="form-group">
+                <label>포함할 태그</label>
+                <input type="text" id="includeTags" placeholder="쉼표로 여러 개 지정 가능" onkeyup="renderWorks()">
+            </div>
+            <div class="form-group">
+                <label>제외할 태그</label>
+                <input type="text" id="excludeTags" placeholder="쉼표로 여러 개 지정 가능" onkeyup="renderWorks()">
+            </div>
+        </div>
+        <div class="form-row form-row-mobile" style="margin-top:10px;">
+            <div class="form-group">
+                <select id="filterFav" onchange="renderWorks()">
+                    <option value="all">전체 작품 보기</option>
+                    <option value="fav">⭐ 즐겨찾기만 보기</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <select id="sortOrder" onchange="renderWorks()">
+                    <option value="recent">최신 등록순</option>
+                    <option value="ratingHigh">평점 높은순</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="card backup-zone">
+        <button onclick="exportJSON()">JSON 데이터 백업</button>
+        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+        <button class="btn-secondary" onclick="document.getElementById('importFile').click()">JSON 데이터 복원</button>
+    </div>
+
+    <div id="worksList"></div>
+</div>
+
+<script>
+    // [중요] 내 Supabase 정보로 정확히 변경하세요.
+    const SUPABASE_URL = 'https://wvstpuunhdlsqfufxymw.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_oUAh6VeN-WC--oG8TZzHqg_2PYDGajA';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let allWorks = [];
+
+    // 서버에서 데이터 조회
+    async function fetchWorks() {
+        const { data, error } = await supabase
+            .from('works')
+            .select('*');
+        
+        if (error) {
+            console.error('조회 오류:', error);
+            alert('데이터 로드 실패');
+            return;
+        }
+        allWorks = data || [];
+        renderWorks();
+    }
+
+    // 공백 및 쉼표 파싱 처리 함수
+    function parseTags(str) {
+        if (!str) return [];
+        return str.split(',').map(t => t.trim()).filter(t => t.length > 0);
+    }
+
+    // 등록 및 수정 완료 기능
+    async function saveWork() {
+        const id = document.getElementById('workId').value;
+        const title = document.getElementById('title').value.trim();
+        const author = document.getElementById('author').value.trim() || null;
+        const link = document.getElementById('link').value.trim() || null;
+        const review_short = document.getElementById('review_short').value.trim() || null;
+        const review_long = document.getElementById('review_long').value.trim() || null;
+        const ratingVal = document.getElementById('rating').value;
+        const rating = ratingVal ? parseInt(ratingVal, 10) : null;
+        const favorite = document.getElementById('favorite').checked;
+        const tags = parseTags(document.getElementById('tags').value);
+
+        if (!title) return alert('제목은 필수 입력 사항입니다.');
+
+        const payload = { title, author, link, review_short, review_long, rating, favorite, tags };
+
+        let error;
+        if (id) {
+            const res = await supabase.from('works').update(payload).eq('id', id);
+            error = res.error;
+        } else {
+            const res = await supabase.from('works').insert([payload]);
+            error = res.error;
+        }
+
+        if (error) {
+            console.error('저장 에러:', error);
+            alert('DB 저장 도중 오류가 발생했습니다.');
+        } else {
+            resetForm();
+            fetchWorks();
+        }
+    }
+
+    // 수정 폼 셋팅
+    function editWork(id) {
+        const item = allWorks.find(w => w.id == id);
+        if (!item) return;
+
+        document.getElementById('workId').value = item.id;
+        document.getElementById('title').value = item.title;
+        document.getElementById('author').value = item.author || '';
+        document.getElementById('link').value = item.link || '';
+        document.getElementById('review_short').value = item.review_short || '';
+        document.getElementById('review_long').value = item.review_long || '';
+        document.getElementById('rating').value = item.rating || '';
+        document.getElementById('favorite').checked = !!item.favorite;
+        document.getElementById('tags').value = (item.tags || []).join(', ');
+
+        document.getElementById('formTitle').innerText = '작품 수정 중';
+        document.getElementById('saveBtn').innerText = '수정 완료';
+        document.getElementById('cancelBtn').style.display = 'inline-block';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function resetForm() {
+        document.getElementById('workId').value = '';
+        document.getElementById('title').value = '';
+        document.getElementById('author').value = '';
+        document.getElementById('link').value = '';
+        document.getElementById('review_short').value = '';
+        document.getElementById('review_long').value = '';
+        document.getElementById('rating').value = '';
+        document.getElementById('favorite').checked = false;
+        document.getElementById('tags').value = '';
+
+        document.getElementById('formTitle').innerText = '새 작품 등록';
+        document.getElementById('saveBtn').innerText = '저장하기';
+        document.getElementById('cancelBtn').style.display = 'none';
+    }
+
+    // 삭제 실행
+    async function deleteWork(id) {
+        if (!confirm('기록을 정말로 삭제할까요?')) return;
+        const { error } = await supabase.from('works').delete().eq('id', id);
+        if (error) alert('삭제 실패');
+        else fetchWorks();
+    }
+
+    // 렌더링 + 다중 검색/필터/정렬 연산
+    function renderWorks() {
+        const searchTitle = document.getElementById('searchTitle').value.toLowerCase();
+        const includeTags = parseTags(document.getElementById('includeTags').value.toLowerCase());
+        const excludeTags = parseTags(document.getElementById('excludeTags').value.toLowerCase());
+        const filterFav = document.getElementById('filterFav').value;
+        const sortOrder = document.getElementById('sortOrder').value;
+
+        // 1. 필터링 연산
+        let filtered = allWorks.filter(item => {
+            if (searchTitle && !item.title.toLowerCase().includes(searchTitle)) return false;
+            
+            if (filterFav === 'fav' && !item.favorite) return false;
+
+            const itemTags = (item.tags || []).map(t => t.toLowerCase());
+            
+            // 포함 태그 다중 선택 검사 (AND)
+            if (includeTags.length > 0) {
+                if (!includeTags.every(t => itemTags.includes(t))) return false;
+            }
+            // 제외 태그 검사 (OR)
+            if (excludeTags.length > 0) {
+                if (excludeTags.some(t => itemTags.includes(t))) return false;
+            }
+
+            return true;
+        });
+
+        // 2. 정렬 연산
+        if (sortOrder === 'recent') {
+            // id 또는 created_at 기준 내림차순 정렬
+            filtered.sort((a, b) => b.id - a.id);
+        } else if (sortOrder === 'ratingHigh') {
+            // 평점 기준 내림차순 정렬 (평점이 없는 항목은 뒤로 보냄)
+            filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        }
+
+        // 3. HTML 그리기
+        const listContainer = document.getElementById('worksList');
+        listContainer.innerHTML = '';
+
+        if (filtered.length === 0) {
+            listContainer.innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">등록된 아카이브 내역이 없습니다.</p>';
+            return;
+        }
+
+        filtered.forEach(item => {
+            const div = document.createElement('div');
+            div.className = 'work-item';
+
+            const stars = item.rating ? '⭐'.repeat(item.rating) : '평점 없음';
+            const favBadge = item.favorite ? '<span class="fav-star">★ 즐겨찾기</span>' : '';
+            const tagsHtml = (item.tags || []).map(t => `<span>#${t}</span>`).join('');
+            
+            let reviewHtml = '';
+            if (item.review_short || item.review_long) {
+                reviewHtml = `
+                    <div class="review-box">
+                        <strong>${item.review_short || '감상 평평'}</strong>
+                        ${item.review_long ? `<div class="review-long">${item.review_long}</div>` : ''}
+                    </div>
+                `;
+            }
+
+            let linkHtml = item.link ? `<a class="work-link" href="${item.link}" target="_blank" rel="noopener">🔗 원문 보러가기</a>` : '';
+            let authorHtml = item.author ? `<div class="work-author">글/작가: ${item.author}</div>` : '';
+
+            div.innerHTML = `
+                <div class="work-header">
+                    <div>
+                        <h3 class="work-title">${item.title}</h3>
+                        ${authorHtml}
+                    </div>
+                    <div>${favBadge}</div>
+                </div>
+                <div class="rating-display">${stars}</div>
+                ${linkHtml}
+                ${reviewHtml}
+                <div class="tags">${tagsHtml}</div>
+                <div class="item-actions">
+                    <button class="btn-secondary" onclick="editWork('${item.id}')">수정</button>
+                    <button class="btn-danger" onclick="deleteWork('${item.id}')">삭제</button>
+                </div>
+            `;
+            listContainer.appendChild(div);
+        });
+    }
+
+    // JSON 백업 다운로드
+    function exportJSON() {
+        if (allWorks.length === 0) return alert('백업할 데이터가 비어 있습니다.');
+        // 순수 필드 데이터만 보존하여 백업 파일 구성
+        const cleanData = allWorks.map(({ id, created_at, ...pureFields }) => pureFields);
+        
+        const blob = new Blob([JSON.stringify(cleanData, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `archive_db_backup_${new Date().toISOString().slice(0,10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // JSON 복원 업로드
+    function importJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                const parsed = JSON.parse(e.target.result);
+                if (!Array.isArray(parsed)) throw new Error();
+
+                if (!confirm(`${parsed.length}개의 데이터를 현재 보관함에 추가 적재할까요?`)) {
+                    event.target.value = '';
+                    return;
+                }
+
+                const { error } = await supabase.from('works').insert(parsed);
+                if (error) {
+                    console.error(error);
+                    alert('복원 진행 과정 중 DB 오류 발생');
+                } else {
+                    alert('정상적으로 복원이 완료되었습니다.');
+                    fetchWorks();
+                }
+            } catch (err) {
+                alert('유효하지 않은 백업용 JSON 파일 형식입니다.');
+            }
+            event.target.value = '';
+        };
+        reader.readAsText(file);
+    }
+
+    // 웹앱 실행과 동시에 원격 데이터 동기화
+    fetchWorks();
+</script>
+
+</body>
+</html>
