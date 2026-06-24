@@ -3,239 +3,345 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>작품 아카이브 웹앱</title>
+    <title>개인 작품 아카이브</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --favorite: #f59e0b;
-            --bg: #f8fafc;
-            --surface: #ffffff;
-            --text: #1e293b;
-            --text-light: #64748b;
-            --border: #cbd5e1;
+            --bg: #0a0a0a;
+            --surface: #121212;
+            --text-main: #e5e5e5;
+            --text-muted: #8c8c8c;
+            --border: #262626;
+            --border-light: #404040;
+            --accent: #ffffff;
+            --star: #d4af37;
         }
+
         * { box-sizing: border-box; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: 'Noto Sans KR', sans-serif;
             background-color: var(--bg);
-            color: var(--text);
+            color: var(--text-main);
             margin: 0;
             padding: 15px;
             line-height: 1.5;
+            font-weight: 300;
+            font-size: 0.9rem; /* 전체적인 기본 폰트 크기 축소 */
         }
-        .container { max-width: 700px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 20px; font-size: 1.8rem; }
+
+        .page-wrapper {
+            max-width: 1400px; /* 넓은 화면을 활용하기 위해 최대 폭 확장 */
+            margin: 0 auto;
+            border: 1px solid var(--border);
+            padding: 20px;
+        }
+
+        h1 { 
+            text-align: center; 
+            font-family: 'Cinzel', serif; 
+            font-size: 2rem; 
+            margin: 0 0 20px 0; 
+            border-bottom: 1px solid var(--border); 
+            padding-bottom: 15px; 
+            letter-spacing: 3px;
+        }
+        
+        /* 동적 대시보드 레이아웃 (기본 세로 스택) */
+        .main-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* 컨트롤 영역 (폼 + 필터) */
+        .controls-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .section-title {
+            font-family: 'Cinzel', serif;
+            font-size: 1rem;
+            color: var(--accent);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 6px;
+            margin-bottom: 12px;
+            display: block;
+            letter-spacing: 1px;
+        }
+
+        /* 콤팩트 카드 스타일 */
         .card {
             background: var(--surface);
-            padding: 20px;
-            border-radius: 12px;
             border: 1px solid var(--border);
-            margin-bottom: 16px;
+            padding: 15px; /* 내부 여백 축소 */
         }
-        h3 { margin-top: 0; margin-bottom: 15px; font-size: 1.2rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px; }
-        .form-group { margin-bottom: 12px; }
-        .form-row { display: flex; gap: 10px; margin-bottom: 12px; }
-        .form-row > * { flex: 1; min-width: 0; }
-        label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.9rem; }
+
+        .form-row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .form-row > * { flex: 1; min-width: 120px; }
+        .form-group { margin-bottom: 10px; }
+        
+        label { 
+            display: block; 
+            margin-bottom: 3px; 
+            font-size: 0.75rem; 
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
         input[type="text"], input[type="number"], select, textarea {
             width: 100%;
-            padding: 10px;
+            padding: 8px 10px; /* 인풋 패딩 축소 */
+            background: transparent;
             border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 1rem;
-            background: #fff;
-        }
-        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 28px; }
-        .checkbox-group input { width: 18px; height: 18px; }
-        button {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 1rem;
-            font-weight: 600;
-            width: 100%;
-            transition: background 0.2s;
-        }
-        button:hover { background-color: var(--primary-hover); }
-        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn-danger { background-color: #ef4444; }
-        .btn-danger:hover { background-color: #dc2626; }
-        .btn-secondary { background-color: #64748b; }
-        .btn-secondary:hover { background-color: #475569; }
-        
-        /* 필터 섹션 */
-        .filter-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        @media (min-width: 480px) {
-            .filter-grid { grid-template-columns: 1fr 1fr; }
-            .form-row-mobile { display: flex; gap: 10px; }
+            color: var(--text-main);
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 0.85rem;
+            outline: none;
         }
 
-        /* 작품 아이템 스타일 */
+        input:focus, select:focus, textarea:focus { border-color: var(--border-light); }
+        select option { background-color: var(--surface); color: var(--text-main); }
+
+        .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 22px; cursor: pointer; }
+        .checkbox-group input { width: 14px; height: 14px; accent-color: var(--accent); }
+
+        button {
+            background-color: var(--accent);
+            color: var(--bg);
+            border: 1px solid var(--accent);
+            padding: 8px 16px;
+            cursor: pointer;
+            font-family: 'Noto Sans KR', sans-serif;
+            font-size: 0.85rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        button:hover { background-color: transparent; color: var(--accent); }
+        
+        .btn-group { display: flex; gap: 8px; margin-top: 10px; }
+        .btn-outline { background-color: transparent; color: var(--accent); }
+        .btn-outline:hover { background-color: var(--border); }
+        .btn-danger { background-color: transparent; color: #ff5555; border-color: #ff5555; }
+        .btn-danger:hover { background-color: #ff5555; color: #000; }
+
+        /* 작품 목록 기본 (세로 리스트) */
+        .works-container {
+            flex: 1;
+        }
+        
+        .works-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* 작품 아이템 콤팩트 스타일 */
         .work-item {
             border: 1px solid var(--border);
-            padding: 16px;
-            border-radius: 10px;
-            margin-bottom: 12px;
+            padding: 12px 15px;
             background: var(--surface);
-            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: border-color 0.2s;
         }
-        .work-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
-        .work-title { font-size: 1.2rem; margin: 0; font-weight: bold; }
-        .work-author { font-size: 0.95rem; color: var(--text-light); margin: 2px 0 8px 0; }
-        .fav-star { color: var(--favorite); font-size: 1.2rem; }
-        .rating-display { color: var(--favorite); margin-bottom: 8px; }
-        .review-box { background: #f1f5f9; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 0.95rem; }
-        .review-long { font-size: 0.9rem; color: #334155; white-space: pre-wrap; border-top: 1px dashed #cbd5e1; padding-top: 6px; margin-top: 6px; }
-        .work-link { display: inline-block; font-size: 0.85rem; color: var(--primary); margin-bottom: 8px; word-break: break-all; }
-        .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-        .tags span { background: #e0f2fe; color: #0369a1; padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: 500; }
-        .item-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; border-top: 1px solid #f1f5f9; padding-top: 8px; }
-        .item-actions button { width: auto; padding: 6px 12px; font-size: 0.85rem; }
+        .work-item:hover { border-color: var(--border-light); }
 
-        /* 파일 UI */
-        .backup-zone { display: flex; gap: 10px; }
-        .backup-zone button { padding: 10px; font-size: 0.9rem; }
+        .work-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+        .work-title { font-family: 'Cinzel', serif; font-size: 1.15rem; margin: 0; color: var(--accent); line-height: 1.3; }
+        .work-author { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+        
+        .rating-fav { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+        .fav-star { color: var(--star); font-size: 0.7rem; border: 1px solid var(--star); padding: 1px 4px; font-weight: bold; }
+        .rating-display { color: var(--star); font-size: 0.85rem; letter-spacing: 1px; }
+
+        .review-box { font-size: 0.85rem; margin-bottom: 8px; background: rgba(255,255,255,0.02); padding: 6px 10px; border-left: 1px solid var(--border-light); }
+        .review-short { font-weight: 500; color: var(--text-main); }
+        .review-long { color: var(--text-muted); font-size: 0.8rem; white-space: pre-wrap; margin-top: 4px; }
+        
+        .work-link { display: inline-block; font-size: 0.8rem; color: var(--text-muted); text-decoration: underline; margin-bottom: 8px; }
+        .work-link:hover { color: var(--accent); }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+        .tags span { border: 1px solid var(--border); color: var(--text-muted); padding: 1px 6px; font-size: 0.75rem; font-family: 'Cinzel', serif; }
+
+        .item-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+        .item-actions button { width: auto; padding: 4px 10px; font-size: 0.75rem; }
+
+        .backup-zone { display: flex; gap: 10px; margin-top: 5px; }
+        .backup-zone button { padding: 6px; font-size: 0.8rem; }
+
+        /* 💻 가로가 넓은 화면 (PC, 패드 가로)을 위한 반응형 스타일 전환 */
+        @media (min-width: 900px) {
+            .main-layout {
+                flex-direction: row; /* 가로 배열로 변경 */
+                align-items: flex-start;
+            }
+            .controls-sidebar {
+                flex: 0 0 340px; /* 왼쪽 메뉴 영역 너비 고정 */
+                position: sticky; /* 스크롤 내려도 왼쪽에 고정 배치 */
+                top: 15px;
+            }
+            .works-grid {
+                display: grid; /* 작품 목록을 격자형 레이아웃으로 변경 */
+                grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); /* 화면 넓이에 맞춰 가로 배치 자동 계산 */
+                gap: 15px;
+            }
+            .work-item {
+                min-height: 180px; /* 격자 형태일 때 카드 높이 밸런스 유지 */
+            }
+        }
+
+        @media (max-width: 600px) {
+            .page-wrapper { padding: 10px; border: none; }
+            h1 { font-size: 1.6rem; }
+            .form-row { flex-direction: column; gap: 0; }
+        }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>작품 아카이브</h1>
+<div class="page-wrapper">
+    <h1>Archive</h1>
 
-    <div class="card">
-        <h3 id="formTitle">새 작품 등록</h3>
-        <input type="hidden" id="workId">
-        
-        <div class="form-row">
-            <div class="form-group" style="flex: 2;">
-                <label>제목 *</label>
-                <input type="text" id="title" placeholder="작품 제목 입력">
+    <div class="main-layout">
+        <aside class="controls-sidebar">
+            
+            <div class="card">
+                <span class="section-title" id="formTitle">Record a Work</span>
+                <input type="hidden" id="workId">
+                
+                <div class="form-row">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Title *</label>
+                        <input type="text" id="title" placeholder="작품 제목">
+                    </div>
+                    <div class="form-group">
+                        <label>Author</label>
+                        <input type="text" id="author" placeholder="작가명">
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Rating</label>
+                        <select id="rating">
+                            <option value="">선택 안함</option>
+                            <option value="5">★★★★★</option>
+                            <option value="4">★★★★</option>
+                            <option value="3">★★★</option>
+                            <option value="2">★★</option>
+                            <option value="1">★</option>
+                        </select>
+                    </div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="favorite">
+                        <label for="favorite" style="margin:0;">Favorite</label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Source Link</label>
+                    <input type="text" id="link" placeholder="URL 주소">
+                </div>
+
+                <div class="form-group">
+                    <label>Short Comment</label>
+                    <input type="text" id="review_short" placeholder="한 줄 감상">
+                </div>
+
+                <div class="form-group">
+                    <label>Detailed Review</label>
+                    <textarea id="review_long" rows="3" placeholder="상세 기록..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Tags</label>
+                    <input type="text" id="tags" placeholder="쉼표(,) 구분">
+                </div>
+
+                <div class="btn-group">
+                    <button id="saveBtn" onclick="saveWork()">Save</button>
+                    <button id="cancelBtn" class="btn-outline" style="display:none;" onclick="resetForm()">Cancel</button>
+                </div>
             </div>
-            <div class="form-group">
-                <label>작가</label>
-                <input type="text" id="author" placeholder="작가명">
+
+            <div class="card">
+                <span class="section-title">Filter Box</span>
+                <div class="form-group">
+                    <input type="text" id="searchTitle" placeholder="제목 검색..." onkeyup="renderWorks()">
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Include Tags</label>
+                        <input type="text" id="includeTags" placeholder="포함할 태그" onkeyup="renderWorks()">
+                    </div>
+                    <div class="form-group">
+                        <label>Exclude Tags</label>
+                        <input type="text" id="excludeTags" placeholder="제외할 태그" onkeyup="renderWorks()">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <select id="filterFav" onchange="renderWorks()">
+                            <option value="all">View All</option>
+                            <option value="fav">★ Favorites</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <select id="sortOrder" onchange="renderWorks()">
+                            <option value="recent">Latest</option>
+                            <option value="ratingHigh">Top Rated</option>
+                        </select>
+                    </div>
+                </div>
             </div>
-        </div>
 
-        <div class="form-row form-row-mobile">
-            <div class="form-group">
-                <label>평점</label>
-                <select id="rating">
-                    <option value="">평점 선택 없음</option>
-                    <option value="5">⭐⭐⭐⭐⭐ (5점)</option>
-                    <option value="4">⭐⭐⭐⭐ (4점)</option>
-                    <option value="3">⭐⭐⭐ (3점)</option>
-                    <option value="2">⭐⭐ (2점)</option>
-                    <option value="1">⭐ (1점)</option>
-                </select>
+            <div class="card backup-zone">
+                <button class="btn-outline" onclick="exportJSON()">Export</button>
+                <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
+                <button class="btn-outline" onclick="document.getElementById('importFile').click()">Import</button>
             </div>
-            <div class="form-group checkbox-group">
-                <input type="checkbox" id="favorite">
-                <label style="display:inline; cursor:pointer;" for="favorite">즐겨찾기 등록</label>
-            </div>
-        </div>
+        </aside>
 
-        <div class="form-group">
-            <label>원문 링크</label>
-            <input type="text" id="link" placeholder="https://...">
-        </div>
-
-        <div class="form-group">
-            <label>한줄평 (짧은 리뷰)</label>
-            <input type="text" id="review_short" placeholder="목록에 노출될 짧은 감상">
-        </div>
-
-        <div class="form-group">
-            <label>상세 리뷰 (긴 리뷰)</label>
-            <textarea id="review_long" rows="4" placeholder="상세한 후기나 기록을 남겨보세요"></textarea>
-        </div>
-
-        <div class="form-group">
-            <label>태그 (쉼표로 구분)</label>
-            <input type="text" id="tags" placeholder="예: 판타지, 완결, 추천">
-        </div>
-
-        <div class="btn-group">
-            <button id="saveBtn" onclick="saveWork()">저장하기</button>
-            <button id="cancelBtn" class="btn-secondary" style="display:none;" onclick="resetForm()">취소</button>
-        </div>
+        <main class="works-container">
+            <div id="worksList" class="works-grid"></div>
+        </main>
     </div>
-
-    <div class="card">
-        <h3>검색 및 조건 필터</h3>
-        <div class="form-group">
-            <input type="text" id="searchTitle" placeholder="제목으로 검색..." onkeyup="renderWorks()">
-        </div>
-        <div class="filter-grid">
-            <div class="form-group">
-                <label>포함할 태그</label>
-                <input type="text" id="includeTags" placeholder="쉼표로 여러 개 지정 가능" onkeyup="renderWorks()">
-            </div>
-            <div class="form-group">
-                <label>제외할 태그</label>
-                <input type="text" id="excludeTags" placeholder="쉼표로 여러 개 지정 가능" onkeyup="renderWorks()">
-            </div>
-        </div>
-        <div class="form-row form-row-mobile" style="margin-top:10px;">
-            <div class="form-group">
-                <select id="filterFav" onchange="renderWorks()">
-                    <option value="all">전체 작품 보기</option>
-                    <option value="fav">⭐ 즐겨찾기만 보기</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <select id="sortOrder" onchange="renderWorks()">
-                    <option value="recent">최신 등록순</option>
-                    <option value="ratingHigh">평점 높은순</option>
-                </select>
-            </div>
-        </div>
-    </div>
-
-    <div class="card backup-zone">
-        <button onclick="exportJSON()">JSON 데이터 백업</button>
-        <input type="file" id="importFile" accept=".json" style="display:none;" onchange="importJSON(event)">
-        <button class="btn-secondary" onclick="document.getElementById('importFile').click()">JSON 데이터 복원</button>
-    </div>
-
-    <div id="worksList"></div>
 </div>
 
 <script>
-    // [중요] 내 Supabase 정보로 정확히 변경하세요.
-    const SUPABASE_URL = 'https://wvstpuunhdlsqfufxymw.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_oUAh6VeN-WC--oG8TZzHqg_2PYDGajA';
+    // 본인의 Supabase 정보 입력
+    const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+    const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let allWorks = [];
 
-    // 서버에서 데이터 조회
     async function fetchWorks() {
-        const { data, error } = await supabase
-            .from('works')
-            .select('*');
-        
+        const { data, error } = await supabase.from('works').select('*');
         if (error) {
-            console.error('조회 오류:', error);
-            alert('데이터 로드 실패');
+            console.error('Data load error:', error);
+            alert('데이터 로드에 실패했습니다. RLS 및 URL 설정을 확인하세요.');
             return;
         }
         allWorks = data || [];
         renderWorks();
     }
 
-    // 공백 및 쉼표 파싱 처리 함수
     function parseTags(str) {
         if (!str) return [];
         return str.split(',').map(t => t.trim()).filter(t => t.length > 0);
     }
 
-    // 등록 및 수정 완료 기능
     async function saveWork() {
         const id = document.getElementById('workId').value;
         const title = document.getElementById('title').value.trim();
@@ -248,7 +354,7 @@
         const favorite = document.getElementById('favorite').checked;
         const tags = parseTags(document.getElementById('tags').value);
 
-        if (!title) return alert('제목은 필수 입력 사항입니다.');
+        if (!title) return alert('제목은 필수입니다.');
 
         const payload = { title, author, link, review_short, review_long, rating, favorite, tags };
 
@@ -262,15 +368,14 @@
         }
 
         if (error) {
-            console.error('저장 에러:', error);
-            alert('DB 저장 도중 오류가 발생했습니다.');
+            console.error('Save error:', error);
+            alert('저장에 실패했습니다.');
         } else {
             resetForm();
             fetchWorks();
         }
     }
 
-    // 수정 폼 셋팅
     function editWork(id) {
         const item = allWorks.find(w => w.id == id);
         if (!item) return;
@@ -285,8 +390,8 @@
         document.getElementById('favorite').checked = !!item.favorite;
         document.getElementById('tags').value = (item.tags || []).join(', ');
 
-        document.getElementById('formTitle').innerText = '작품 수정 중';
-        document.getElementById('saveBtn').innerText = '수정 완료';
+        document.getElementById('formTitle').innerText = 'Edit Record';
+        document.getElementById('saveBtn').innerText = 'Update';
         document.getElementById('cancelBtn').style.display = 'inline-block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
@@ -302,20 +407,18 @@
         document.getElementById('favorite').checked = false;
         document.getElementById('tags').value = '';
 
-        document.getElementById('formTitle').innerText = '새 작품 등록';
-        document.getElementById('saveBtn').innerText = '저장하기';
+        document.getElementById('formTitle').innerText = 'Record a Work';
+        document.getElementById('saveBtn').innerText = 'Save';
         document.getElementById('cancelBtn').style.display = 'none';
     }
 
-    // 삭제 실행
     async function deleteWork(id) {
-        if (!confirm('기록을 정말로 삭제할까요?')) return;
+        if (!confirm('삭제하시겠습니까?')) return;
         const { error } = await supabase.from('works').delete().eq('id', id);
         if (error) alert('삭제 실패');
         else fetchWorks();
     }
 
-    // 렌더링 + 다중 검색/필터/정렬 연산
     function renderWorks() {
         const searchTitle = document.getElementById('searchTitle').value.toLowerCase();
         const includeTags = parseTags(document.getElementById('includeTags').value.toLowerCase());
@@ -323,41 +426,28 @@
         const filterFav = document.getElementById('filterFav').value;
         const sortOrder = document.getElementById('sortOrder').value;
 
-        // 1. 필터링 연산
         let filtered = allWorks.filter(item => {
             if (searchTitle && !item.title.toLowerCase().includes(searchTitle)) return false;
-            
             if (filterFav === 'fav' && !item.favorite) return false;
 
             const itemTags = (item.tags || []).map(t => t.toLowerCase());
-            
-            // 포함 태그 다중 선택 검사 (AND)
-            if (includeTags.length > 0) {
-                if (!includeTags.every(t => itemTags.includes(t))) return false;
-            }
-            // 제외 태그 검사 (OR)
-            if (excludeTags.length > 0) {
-                if (excludeTags.some(t => itemTags.includes(t))) return false;
-            }
+            if (includeTags.length > 0 && !includeTags.every(t => itemTags.includes(t))) return false;
+            if (excludeTags.length > 0 && excludeTags.some(t => itemTags.includes(t))) return false;
 
             return true;
         });
 
-        // 2. 정렬 연산
         if (sortOrder === 'recent') {
-            // id 또는 created_at 기준 내림차순 정렬
             filtered.sort((a, b) => b.id - a.id);
         } else if (sortOrder === 'ratingHigh') {
-            // 평점 기준 내림차순 정렬 (평점이 없는 항목은 뒤로 보냄)
             filtered.sort((a, b) => (b.rating || 0) - (a.rating || 0));
         }
 
-        // 3. HTML 그리기
         const listContainer = document.getElementById('worksList');
         listContainer.innerHTML = '';
 
         if (filtered.length === 0) {
-            listContainer.innerHTML = '<p style="text-align:center; color:#64748b; padding:20px;">등록된 아카이브 내역이 없습니다.</p>';
+            listContainer.innerHTML = '<p style="text-align:center; color:var(--border-light); padding:40px; font-style:italic; grid-column: 1/-1;">No records found.</p>';
             return;
         }
 
@@ -365,96 +455,78 @@
             const div = document.createElement('div');
             div.className = 'work-item';
 
-            const stars = item.rating ? '⭐'.repeat(item.rating) : '평점 없음';
-            const favBadge = item.favorite ? '<span class="fav-star">★ 즐겨찾기</span>' : '';
-            const tagsHtml = (item.tags || []).map(t => `<span>#${t}</span>`).join('');
+            const stars = item.rating ? '★'.repeat(item.rating) : 'Unrated';
+            const favBadge = item.favorite ? '<span class="fav-star">FAVORITE</span>' : '';
+            const tagsHtml = (item.tags || []).map(t => `<span>${t}</span>`).join('');
             
             let reviewHtml = '';
             if (item.review_short || item.review_long) {
-                reviewHtml = `
-                    <div class="review-box">
-                        <strong>${item.review_short || '감상 평평'}</strong>
-                        ${item.review_long ? `<div class="review-long">${item.review_long}</div>` : ''}
-                    </div>
-                `;
+                reviewHtml = `<div class="review-box">`;
+                if(item.review_short) reviewHtml += `<div class="review-short">"${item.review_short}"</div>`;
+                if(item.review_long) reviewHtml += `<div class="review-long">${item.review_long}</div>`;
+                reviewHtml += `</div>`;
             }
 
-            let linkHtml = item.link ? `<a class="work-link" href="${item.link}" target="_blank" rel="noopener">🔗 원문 보러가기</a>` : '';
-            let authorHtml = item.author ? `<div class="work-author">글/작가: ${item.author}</div>` : '';
+            let linkHtml = item.link ? `<a class="work-link" href="${item.link}" target="_blank" rel="noopener">Source Link ↗</a>` : '';
+            let authorHtml = item.author ? `<div class="work-author">by ${item.author}</div>` : '';
 
             div.innerHTML = `
-                <div class="work-header">
-                    <div>
-                        <h3 class="work-title">${item.title}</h3>
-                        ${authorHtml}
+                <div>
+                    <div class="work-header">
+                        <div>
+                            <h3 class="work-title">${item.title}</h3>
+                            ${authorHtml}
+                        </div>
+                        <div class="rating-fav">
+                            ${favBadge}
+                            <div class="rating-display">${stars}</div>
+                        </div>
                     </div>
-                    <div>${favBadge}</div>
+                    ${reviewHtml}
+                    ${linkHtml}
+                    <div class="tags">${tagsHtml}</div>
                 </div>
-                <div class="rating-display">${stars}</div>
-                ${linkHtml}
-                ${reviewHtml}
-                <div class="tags">${tagsHtml}</div>
                 <div class="item-actions">
-                    <button class="btn-secondary" onclick="editWork('${item.id}')">수정</button>
-                    <button class="btn-danger" onclick="deleteWork('${item.id}')">삭제</button>
+                    <button class="btn-outline" onclick="editWork('${item.id}')">Edit</button>
+                    <button class="btn-danger" onclick="deleteWork('${item.id}')">Delete</button>
                 </div>
             `;
             listContainer.appendChild(div);
         });
     }
 
-    // JSON 백업 다운로드
     function exportJSON() {
-        if (allWorks.length === 0) return alert('백업할 데이터가 비어 있습니다.');
-        // 순수 필드 데이터만 보존하여 백업 파일 구성
+        if (allWorks.length === 0) return alert('백업할 데이터가 없습니다.');
         const cleanData = allWorks.map(({ id, created_at, ...pureFields }) => pureFields);
-        
         const blob = new Blob([JSON.stringify(cleanData, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `archive_db_backup_${new Date().toISOString().slice(0,10)}.json`;
-        document.body.appendChild(a);
+        a.download = `archive_backup_${new Date().toISOString().slice(0,10)}.json`;
         a.click();
-        document.body.removeChild(a);
         URL.revokeObjectURL(url);
     }
 
-    // JSON 복원 업로드
     function importJSON(event) {
         const file = event.target.files[0];
         if (!file) return;
-
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
                 const parsed = JSON.parse(e.target.result);
                 if (!Array.isArray(parsed)) throw new Error();
-
-                if (!confirm(`${parsed.length}개의 데이터를 현재 보관함에 추가 적재할까요?`)) {
-                    event.target.value = '';
-                    return;
-                }
+                if (!confirm(`${parsed.length}개의 데이터를 추가할까요?`)) { event.target.value = ''; return; }
 
                 const { error } = await supabase.from('works').insert(parsed);
-                if (error) {
-                    console.error(error);
-                    alert('복원 진행 과정 중 DB 오류 발생');
-                } else {
-                    alert('정상적으로 복원이 완료되었습니다.');
-                    fetchWorks();
-                }
-            } catch (err) {
-                alert('유효하지 않은 백업용 JSON 파일 형식입니다.');
-            }
+                if (error) alert('DB 저장 오류');
+                else { alert('완료되었습니다.'); fetchWorks(); }
+            } catch (err) { alert('잘못된 파일입니다.'); }
             event.target.value = '';
         };
         reader.readAsText(file);
     }
 
-    // 웹앱 실행과 동시에 원격 데이터 동기화
     fetchWorks();
 </script>
-
 </body>
 </html>
